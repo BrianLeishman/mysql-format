@@ -1,0 +1,8 @@
+[package]
+name = "mysql-format"
+version = "0.1.0"
+authors = ["Brian Leishman <brian@stumpyinc.com>"]
+
+[dependencies]
+time = "*"
+htmlescape = "*"
