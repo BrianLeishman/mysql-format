@@ -1,8 +1,0 @@
-<pre><code><b style="color:#1976d2">select</b><span style="color:#795548">`users`</span><b>.</b><span style="color:#795548">`UserID`</span>
-<b style="color:#1976d2">from</b><span style="color:#795548">`users`</span>
-<b style="color:#1976d2">join</b><span style="color:#795548">`companies`</span><b style="color:#1976d2">using</b><b>(</b><span style="color:#795548">`CompanyID`</span><b>)</b>
-<b style="color:#1976d2">where</b><span style="color:#795548">`users`</span><b>.</b><span style="color:#795548">`Email`</span><b>=</b><span style="color:#4caf50">'&lt;phil@redshift.com&gt;'</span>
-<b style="color:#1976d2">and</b><span style="color:#795548">`companies`</span><b>.</b><span style="color:#795548">`NetworkID`</span><b>=</b><span style="color:#ff9800">0</span><b style="color:#1976d2">x1541a488c87419f2</b> 
-<b style="color:#1976d2">and</b><span style="color:#795548">`users`</span><b>.</b><span style="color:#795548">`__Active`</span><b>&lt;</b><b>&gt;</b><span style="color:#ff9800">0</span>
-<b style="color:#1976d2">order</b> <b style="color:#1976d2">by</b><span style="color:#795548">`users`</span><b>.</b><span style="color:#795548">`__Added`</span><b style="color:#1976d2">desc</b> 
-<b style="color:#1976d2">limit</b> <span style="color:#ff9800">1</span><b>;</b></code></pre>
