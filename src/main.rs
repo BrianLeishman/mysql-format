@@ -12,13 +12,15 @@ enum Token {
     Symbol = 3,
     Number = 4,
     String = 5,
+    Hex = 6,
+    HexString = 7,
 }
 
 const MYSQL: &str = "select`users`.`UserID`
 from`users`
 join`companies`using(`CompanyID`)
 where`users`.`Email`='<phil@redshift.com>'
-and`companies`.`NetworkID`=0x1541A488C87419F2
+and`companies`.`NetworkID`=x'1541A488C87419F2'
 and`users`.`__Active`<>0 
 order by`users`.`__Added`desc
 limit 1;";
@@ -35,10 +37,16 @@ fn main() {
     let mut quote = '\'';
     let mut p = 0;
     let mut prev_str = String::new();
+    let mut skip = 0u8;
     // let mut prev_char = '+';
 
     let start = PreciseTime::now();
     for (i, b) in bytes.iter().enumerate() {
+        if skip != 0 {
+            skip -= 1;
+            continue;
+        }
+
         macro_rules! push_newline {
             () => {
                 s.push_str(&format!("\n{}", " ".repeat(4 * p)));
@@ -126,6 +134,15 @@ fn main() {
                         s.push_str(&MYSQL[token_start..=token_end]);
                         s.push_str("</span>");
                     }
+                    Token::Hex | Token::HexString => {
+                        match prev_token {
+                            Token::Word => s.push(' '),
+                            _ => {}
+                        }
+                        s.push_str("<span style=\"color:#673ab7;background-color:#f0f0f0\">");
+                        s.push_str(&MYSQL[token_start..=token_end]);
+                        s.push_str("</span>");
+                    }
                     Token::Symbol => {
                         s.push_str("<b>");
                         s.push_str(&encode_minimal(&format!("{}", bytes[i] as char)));
@@ -171,13 +188,44 @@ fn main() {
                     escaped = false;
                 }
             }
+            Token::HexString => match *b as char {
+                '\'' => {
+                    token_end = i - 1;
+                    push_token!();
+                    continue;
+                }
+                _ => {}
+            },
             Token::Symbol => {}
+            Token::Hex => match *b as char {
+                'a'...'f' | 'A'...'F' | '0'...'9' => {}
+                _ => {
+                    token_end = i - 1;
+                    push_token!();
+                }
+            },
         }
 
         // Set token if we're currently unset
         match cur_token {
             Token::Unset => match *b as char {
                 'a'...'z' | 'A'...'Z' => {
+                    match *b as char {
+                        'x' | 'X' => {
+                            if i + 1 < len {
+                                let next_b = bytes[i + 1] as char;
+                                if next_b == '\'' {
+                                    cur_token = Token::HexString;
+                                    token_start = i;
+                                    skip = 1;
+                                }
+                            }
+
+                            continue;
+                        }
+                        _ => {}
+                    }
+
                     cur_token = Token::Word;
                     token_start = i;
                 }
@@ -192,6 +240,22 @@ fn main() {
                     quote = *b as char
                 }
                 '0'...'9' => {
+                    match *b as char {
+                        '0' => {
+                            if i + 1 < len {
+                                let next_b = bytes[i + 1] as char;
+                                if next_b == 'x' || next_b == 'X' {
+                                    cur_token = Token::Hex;
+                                    token_start = i;
+                                    skip = 1;
+                                }
+                            }
+
+                            continue;
+                        }
+                        _ => {}
+                    }
+
                     cur_token = Token::Number;
                     token_start = i;
                 }
