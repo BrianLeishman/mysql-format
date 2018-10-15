@@ -33,7 +33,7 @@ enum Token {
 const _MYSQL: &str = "select`users`.`UserID` `id`,now(+6365)
 from`users`
 join`companies`using(`CompanyID`)
-where`users`.`Email`='<phil@redshift.com>'
+where`users`.`Email`='プログラマーズ>'
 and`companies`.`NetworkID`=x'1541A488C87419F2'
 and`companies`.`CompanyID`in(@@AdminCompanyIDs)
 and`users`.`__Active`<>0.0 
@@ -299,7 +299,7 @@ fn mysql_format(mysql: &str) -> String {
             }
             Token::HexString => match *b as char {
                 '\'' => {
-                    token_end = i - 1;
+                    token_end = i;
                     push_token!();
                     continue;
                 }
@@ -435,7 +435,7 @@ fn mysql_format(mysql: &str) -> String {
 
 fn main() {
     let start = PreciseTime::now();
-    let s = mysql_format(_MYSQL3);
+    let s = mysql_format(_MYSQL);
     let end = PreciseTime::now();
 
     println!("{}", s);
