@@ -6,4 +6,6 @@ authors = ["Brian Leishman <brian@stumpyinc.com>"]
 [dependencies]
 time = "*"
 htmlescape = "*"
+cached = "*"
+lazy_static = "*"
 maplit = "*"
