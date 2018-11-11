@@ -1,27 +1,17 @@
-// extern crate htmlescape;
 extern crate phf;
-// extern crate regex;
 extern crate time;
 
-// use htmlescape::encode_minimal_w;
-// use std::borrow::BorrowMut;
-// use regex::Captures;
-// use regex::Regex;
-// use std::borrow::Cow;
 use std::fs;
 use time::PreciseTime;
 
-// #[macro_use]
-// extern crate lazy_static;
+include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 
-// include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
-
-// pub fn is_function(word: &str) -> bool {
-//     FUNCTIONS.contains(word)
-// }
-// pub fn is_word(word: &str) -> bool {
-//     KEYWORDS.contains(word)
-// }
+pub fn is_function(word: &str) -> bool {
+    FUNCTIONS.contains(word)
+}
+pub fn is_word(word: &str) -> bool {
+    KEYWORDS.contains(word)
+}
 
 #[derive(PartialEq)]
 enum Token {
@@ -38,12 +28,14 @@ enum Token {
     Variable,
 }
 
-const _MYSQL: &str = "select`users`.`UserID` `id`,now(+6365)
+const _MYSQL: &str = "select`users`.`UserID`id,now(+6365)
 from`users`
 join`companies`using(`CompanyID`)
-where`users`.`Email`='プログラマーズ>'
+where`users`.`Email`='プログ\\'ラマーズ>'
 and`companies`.`NetworkID`=x'1541A488C87419F2'
+and`companies`.`NetworkID`=0x1541A488C87419F2
 and`companies`.`CompanyID`in(@@AdminCompanyIDs)
+and yeet.poop   in('')
 and`users`.`__Active`<>0.0 
 and @i := -.232
 order by`users`.`__Added`desc
@@ -527,12 +519,12 @@ fn mysql_format2(mysql: &str) -> String {
         }
 
         macro_rules! push_esc {
-            ($b:expr) => {
-                match $b {
-                    b'<' => push_str!("&lt;"),
-                    b'>' => push_str!("&gt;"),
-                    b'&' => push_str!("&amp;"),
-                    _ => push!($b as char),
+            ($c:expr) => {
+                match $c {
+                    '<' => push_str!("&lt;"),
+                    '>' => push_str!("&gt;"),
+                    '&' => push_str!("&amp;"),
+                    _ => push!($c),
                 }
             };
         }
@@ -545,22 +537,14 @@ fn mysql_format2(mysql: &str) -> String {
 
         macro_rules! push_str_esc {
             ($s:expr) => {
-                for b in $s.bytes() {
-                    push_esc!(b);
+                for c in $s.chars() {
+                    push_esc!(c);
                 }
             };
         }
 
-        macro_rules! check_end_tag {
-            ($t:ident) => {
-                match prev_token {
-                    Token::$t => {}
-                    _ => push_str!(end_tag),
-                }
-            };
+        macro_rules! push_token {
             ($t:ident, $s:expr, $e:expr) => {
-                check_end_tag!($t);
-
                 if prev_token != Token::$t {
                     push_str!($s);
                 }
@@ -571,20 +555,32 @@ fn mysql_format2(mysql: &str) -> String {
             };
         }
 
-        macro_rules! check_prev_space {
-            ($mand_1:ident) => {
+        macro_rules! prep_token {
+            ($t:ident) => {
                 match prev_token {
-                    Token::$mand_1 => {
-                        push!(' ');
-                    }
+                    Token::$t => {}
+                    _ => push_str!(end_tag),
+                }
+            };
+            ($t:ident, $s:expr, $e:expr) => {
+                prep_token!($t);
+
+                push_token!($t, $s, $e);
+            };
+            ($t:ident, $s:expr, $e:expr, $($p:ident),+) => {
+                prep_token!($t);
+
+                match prev_token {
+                    $(Token::$p)|+ => push!(' '),
                     _ => {}
                 }
+
+                push_token!($t, $s, $e);
             };
         }
 
         macro_rules! consume_until_esc {
             ($mand_1:expr) => {
-                next!();
                 while i < len {
                     match bs[i] {
                         $mand_1 => {
@@ -594,37 +590,166 @@ fn mysql_format2(mysql: &str) -> String {
                         _ => next!(),
                     }
                 }
+                prev!();
+            };
+        }
+
+        macro_rules! consume_all_of {
+            ($($p:pat)|+) => {
                 next!();
+                while i < len {
+                    match bs[i] {
+                        $($p)|* => next!(),
+                        _ => {
+                            prev!();
+                            break;
+                        },
+                    }
+                }
             };
         }
 
         macro_rules! push_token_name {
             () => {
-                check_end_tag!(Name, "<span style=\"color:#795548\">", "</span>");
-                check_prev_space!(Name);
-
-                push_str_esc!(&mysql[start..i]);
+                prep_token!(Name, "<span style=\"color:#795548\">", "</span>", Name);
+                push!('`');
+                push_str_esc!(&mysql[start..=i]);
+                push!('`');
             };
         }
 
         macro_rules! push_token_string {
             () => {
-                check_end_tag!(String, "<span style=\"color:#2e7d32\">", "</span>");
+                prep_token!(String, "<span style=\"color:#2e7d32\">", "</span>");
+                push!('\'');
+                push_str_esc!(&mysql[start..=i]);
+                push!('\'');
+            };
+        }
 
-                push_str_esc!(&mysql[start..i]);
+        macro_rules! push_token_number {
+            () => {
+                prep_token!(
+                    Number,
+                    "<span style=\"color:#ce4800\">",
+                    "</span>",
+                    Number,
+                    Word,
+                    Function,
+                    System,
+                    Variable,
+                    Hex
+                );
+                push_str_esc!(&mysql[start..=i]);
+            };
+        }
+
+        macro_rules! push_token_symbol {
+            () => {
+                prep_token!(Symbol, "<b>", "</b>");
+                push_esc!(bs[i] as char);
+            };
+        }
+
+        macro_rules! push_token_word {
+            () => {
+                prep_token!(
+                    Word,
+                    "<b style=\"color:#1976d2\">",
+                    "</b>",
+                    Number,
+                    Word,
+                    Function,
+                    System,
+                    Variable,
+                    Hex
+                );
+                push_str_esc!(&mysql[start..=i]);
+            };
+        }
+
+        macro_rules! push_token_function {
+            () => {
+                prep_token!(
+                    Function,
+                    "<span style=\"color:#d81b60\">",
+                    "</span>",
+                    Number,
+                    Word,
+                    Function,
+                    System,
+                    Variable,
+                    Hex
+                );
+                push_str_esc!(&mysql[start..=i]);
+            };
+        }
+
+        macro_rules! push_token_system {
+            () => {
+                prep_token!(
+                    System,
+                    "<i style=\"color:#00838f\">",
+                    "</i>",
+                    Number,
+                    Word,
+                    Function,
+                    System,
+                    Variable,
+                    Hex
+                );
+                push_str_esc!(&mysql[start..=i]);
+            };
+        }
+
+        macro_rules! push_token_variable {
+            () => {
+                prep_token!(
+                    Variable,
+                    "<span style=\"color:#757575\">",
+                    "</span>",
+                    Number,
+                    Word,
+                    Function,
+                    System,
+                    Variable,
+                    Hex
+                );
+                push_str_esc!(&mysql[start..=i]);
+            };
+        }
+
+        macro_rules! push_token_hex {
+            ($h:ident) => {
+                prep_token!(
+                    $h,
+                    "<span style=\"color:#673ab7;background-color:#f0f0f0\">",
+                    "</span>",
+                    Number,
+                    Word,
+                    Function,
+                    System,
+                    Variable,
+                    Hex
+                );
+                push_str_esc!(&mysql[start..=i]);
             };
         }
 
         match bs[i] {
             b'`' => {
+                next!();
                 start = i;
                 consume_until_esc!{b'`'};
                 push_token_name!();
+                next!();
             }
             b'\'' => {
+                next!();
                 start = i;
                 consume_until_esc!{b'\''};
                 push_token_string!();
+                next!();
             }
             // b'"' => {
             //     next!();
@@ -632,12 +757,75 @@ fn mysql_format2(mysql: &str) -> String {
             //     consume_until_esc!{b'"'};
             //     push_token_string_dbl!();
             // }
+            b'0'...b'9' => {
+                start = i;
+                if i + 1 < len && (bs[i + 1] == b'x' || bs[i + 1] == b'X') {
+                    next!();
+                    consume_all_of!(b'0' ... b'9' | b'a' ... b'f' | b'A' ... b'F');
+                    push_token_hex!(Hex);
+                } else {
+                    consume_all_of!(b'0' ... b'9' | b'.');
+                    push_token_number!();
+                }
+            }
+            b'.' | b'+' | b'-' => {
+                if i + 1 < len {
+                    match bs[i + 1] {
+                        b'0'...b'9' | b'.' | b'+' | b'-' => {
+                            start = i;
+                            consume_all_of!(b'0' ... b'9' | b'.');
+                            push_token_number!();
+                        }
+                        _ => {
+                            push_token_symbol!();
+                        }
+                    }
+                } else {
+                    push_token_symbol!();
+                }
+            }
+            b'=' | b';' | b'(' | b')' | b'?' | b'^' | b'&' | b'|' | b'/' | b'*' | b':' | b'~'
+            | b'<' | b'>' | b'!' | b'%' | b',' => {
+                push_token_symbol!();
+            }
+            b'A'...b'Z' | b'a'...b'z' | b'$' | b'_' => {
+                start = i;
+                if i + 1 < len && (bs[i] == b'x' || bs[i] == b'X') && bs[i + 1] == b'\'' {
+                    next!(2);
+                    consume_until_esc!{b'\''};
+                    next!();
+                    push_token_hex!(HexString);
+                } else {
+                    consume_all_of!(b'0' ... b'9' | b'A'...b'Z' | b'a'...b'z' | b'$' | b'_');
+                    if i + 1 < len && bs[i + 1] == b'(' && is_function(&mysql[start..=i]) {
+                        push_token_function!();
+                    } else if is_word(&mysql[start..=i]) {
+                        push_token_word!();
+                    } else {
+                        push_token_name!();
+                    }
+                }
+            }
+            b'@' => {
+                start = i;
+                let mut sys = false;
+                if i + 1 < len && bs[i + 1] == b'@' {
+                    sys = true;
+                    next!();
+                }
+                consume_all_of!(b'0' ... b'9' | b'A'...b'Z' | b'a'...b'z' | b'$' | b'_');
+                if sys {
+                    push_token_system!();
+                } else {
+                    push_token_variable!();
+                }
+            }
             _ => {}
         }
 
         next!();
         if i == len {
-            check_end_tag!(Unset);
+            prep_token!(Unset);
         }
     }
 
@@ -647,7 +835,7 @@ fn mysql_format2(mysql: &str) -> String {
 
 fn main() {
     let start = PreciseTime::now();
-    let s = mysql_format2(_MYSQL2);
+    let s = mysql_format2(_MYSQL);
     let end = PreciseTime::now();
 
     println!("{}", s);
