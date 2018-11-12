@@ -36,7 +36,7 @@ and`companies`.`NetworkID`=x'1541A488C87419F2'
 and`companies`.`NetworkID`=0x1541A488C87419F2
 and`companies`.`CompanyID`in(@@AdminCompanyIDs)
 and yeet.poop   in('')
-and`users`.`__Active`<>0.0 
+and`users`.`__Active`<>0.0
 and @i := -.232
 order by`users`.`__Added`desc
 limit 1;";
@@ -50,7 +50,7 @@ left join`networklineitemtypes`on`networklineitemtypes`.`NetworkID`=`unb64u`(
     'FUGkiMhy53I')
 and`networklineitemtypes`.`LineItemTypeID`=`lineitemtypes`.`LineItemTypeID`
 where`lineitemtypes`.`LineItemTypeID`=`unb64u`('FUGjIgIAlDI')
-and`lineitems`.`__Active`=1 
+and`lineitems`.`__Active`=1
 and`lineitemtypes`.`__Active`=1;";
 
 const _MYSQL3: &str = r##"
@@ -89,18 +89,18 @@ left join`childlineitems`using(`ChildLineItemID`)
 left join`networkchildlineitems`on`networkchildlineitems`.`NetworkID`=`unb64u`(
     'FUGkiMh0GfI')
 and`networkchildlineitems`.`ChildLineItemID`=`orderchildlineitems`.`ChildLineItemID`
-and`networkchildlineitems`.`__Active`<>0 
+and`networkchildlineitems`.`__Active`<>0
 left join`childlineitemoptions`on`childlineitemoptions`.`ChildLineItemOptionID`=`orderchildlineitems`.`ChildLineItemOptionID`
 and`childlineitemoptions`.`ChildLineItemID`=`childlineitems`.`ChildLineItemID`
 left join`networkchildlineitemoptions`on`networkchildlineitemoptions`.`NetworkID`=`unb64u`(
     'FUGkiMh0GfI')
 and`networkchildlineitemoptions`.`ChildLineItemOptionID`=`childlineitemoptions`.`ChildLineItemOptionID`
-and`networkchildlineitemoptions`.`__Active`<>0 
+and`networkchildlineitemoptions`.`__Active`<>0
 where`orderchildlineitems`.`OrderLineItemID`in(`unb64u`('FWXgjBCaZpA'))
-and(`networkchildlineitems`.`Enabled`<>0 
-    or`childlineitems`.`ChildLineItemID`is null 
+and(`networkchildlineitems`.`Enabled`<>0
+    or`childlineitems`.`ChildLineItemID`is null
     or`orderchildlineitems`.`_Total`<>0)
-and`orderchildlineitems`.`__Active`<>0 
+and`orderchildlineitems`.`__Active`<>0
 order by`orderchildlineitems`.`SortOrder`,
 `orderchildlineitems`.`OrderChildLineItemID`;
 "##;
@@ -155,17 +155,24 @@ fn mysql_format2(mysql: &str) -> String {
 			};
 		}
 
-		macro_rules! push {
-			($c:expr) => {
-				s.push($c);
-			};
-		}
+		// macro_rules! push {
+		// 	($c:expr) => {
+		// 		s.push($c);
+		// 	};
+		// }
 
 		macro_rules! l_push {
 			($c:expr) => {{
 				s.push($c);
 				cur_line_len += 1;
 				len_after_breakpoint += 1;
+
+                if cur_line_len > max_line_len {
+                    // s.push_str(&format!("<u>{{{{yes: cur_line_len: {}}}}}</u>", cur_line_len));
+                    push_breakpoint_newline!();
+                } else {
+                    // s.push_str(&format!("<u>{{{{not: cur_line_len: {}}}}}</u>", cur_line_len));
+                }
 			}};
 		}
 
@@ -191,6 +198,13 @@ fn mysql_format2(mysql: &str) -> String {
 			($s:expr) => {
 				s.push_str($s);
 				cur_line_len += $s.len();
+
+                if cur_line_len > max_line_len {
+                    // push_str!(&format!("<u>{{{{yes: cur_line_len: {}, last_breakpoint: {}, len_after_breakpoint: {}}}}}</u>", cur_line_len, last_breakpoint, len_after_breakpoint));
+                    push_breakpoint_newline!();
+                } else {
+                    // push_str!(&format!("<u>{{{{not: cur_line_len: {}, last_breakpoint: {}, len_after_breakpoint: {}}}}}</u>", cur_line_len, last_breakpoint, len_after_breakpoint));
+                }
 			};
 		}
 
@@ -211,6 +225,18 @@ fn mysql_format2(mysql: &str) -> String {
 			}};
 		}
 
+        macro_rules! push_breakpoint_newline {
+            () => {
+                if last_breakpoint != 0 {
+					s.insert_str(last_breakpoint, &newline[..=breakpoint_p*2]);
+					cur_line_len = len_after_breakpoint;
+					last_breakpoint = 0;
+					len_after_breakpoint = 0;
+					breakpoint_p = p;
+				}
+            };
+        }
+
 		macro_rules! push_token {
 			($t:ident, $s:expr, $e:expr) => {
 				if prev_token != Token::$t {
@@ -230,29 +256,31 @@ fn mysql_format2(mysql: &str) -> String {
                     Token::$t => {}
                     _ => push_str!(end_tag),
                 }
-
-				if cur_line_len > max_line_len && last_breakpoint != 0 && len_after_breakpoint != 0 {
-					s.insert_str(last_breakpoint, &newline[..=breakpoint_p*2]);
-					cur_line_len = len_after_breakpoint;
-					last_breakpoint = 0;
-					len_after_breakpoint = 0;
-					breakpoint_p = p;
-				}
             };
             ($t:ident, $s:expr, $e:expr) => {
                 prep_token!($t);
 
                 push_token!($t, $s, $e);
+
+                // if cur_line_len > max_line_len {
+                //     push_breakpoint_newline!();
+                // }
             };
             ($t:ident, $s:expr, $e:expr, $($p:ident),+) => {
                 prep_token!($t);
 
                 match prev_token {
-                    $(Token::$p)|+ => push!(' '),
+                    $(Token::$p)|+ => l_push!(' '),
                     _ => {}
                 }
 
                 push_token!($t, $s, $e);
+
+                // if cur_line_len > max_line_len {
+                //     push_breakpoint_newline!();
+                // } else {
+                //     s.push_str(&format!("<u>{{{{cur_line_len: {}}}}}</u>", cur_line_len));
+                // }
             };
         }
 
@@ -301,46 +329,58 @@ fn mysql_format2(mysql: &str) -> String {
 			};
 			($st:expr) => {{
 				let l = &mysql[start..=i].len();
-				let long = l > &max_line_len;
+				let long = l > &(max_line_len - p*2);
+
+				let t_start = "<span style=\"color:#009688\">";
+				let t_end = "</span>";
+
 				if long {
-					push_token_function!("concat");
+                    push_newline!();
+                    push_token_function!("concat");
 					push_token_symbol!(b'(');
-				}
 
-				let start = "<span style=\"color:#009688\">";
-				let end = "</span>";
+                    // push_breakpoint_newline!();
 
-				prep_token!(String, start, end);
-				if long {
-					let str_len = max_line_len - p*2 - 10;
+					let str_len = max_line_len - cur_line_len - 10;
+                    // let padding = cur_line_len + 9 - p*2;
 					let len = $st.len();
-					for i in (0..len).step_by(str_len) {
+                    let mut last_escaped = false;
+                    // let mut j = 0;
+					for mut i in &mut (0..len).step_by(str_len) {
+                        prep_token!(String, t_start, t_end);
 						l_push!('\'');
 						if i + str_len + 1 < len {
-							push_str_esc!($st[i..i+str_len]);
+                            if last_escaped {
+                                last_escaped = false;
+                                // j = i - 1;
+                            } else {
+                                // j = i;
+                            }
+                            if $st.as_bytes()[i+str_len-1] == b'\\' {
+							    push_str_esc!($st[i..i+str_len-1]);
+                                i -= 1;
+                                last_escaped = true;
+                            } else {
+                                push_str_esc!($st[i..i+str_len]);
+                            }
 						} else {
 							push_str_esc!($st[i..]);
 						}
 						l_push!('\'');
 
 						if i + str_len < len {
+                            if last_escaped {
+                                l_push!(' ');
+                            }
 							push_token_symbol!(b',');
 							push_newline!();
 							l_push_str!(&newline[1..8]);
-							prep_token!(String, start, end);
 						}
 					}
 
-					// push_token_symbol!(b',');
-					// push_newline!();
-					// l_push_str!(&newline[1..p*2+6]);
-					// prep_token!(String, start, end);
-					// l_push!('\'');
-					// push_str_esc!($st[k..str_len]);
-					// l_push!('\'');
-
 					push_token_symbol!(b')');
 				} else {
+                    prep_token!(String, t_start, t_end);
 					l_push!('\'');
 					push_str_esc!($st);
 					l_push!('\'');
@@ -379,7 +419,7 @@ fn mysql_format2(mysql: &str) -> String {
 						len_after_breakpoint = 0;
 						breakpoint_p = p;
 					},
-					b'=' => {
+					b'=' | b'+' | b'-' | b'*' | b'/' | b')' => {
 						last_breakpoint = s.len();
 						len_after_breakpoint = 0;
 						breakpoint_p = p + 1;
@@ -404,7 +444,7 @@ fn mysql_format2(mysql: &str) -> String {
 					System,
 					Variable,
 					Hex
-					);
+                );
 
 				match $word {
 					"from" | "where" | "and" | "or" | "order" | "group" | "having" | "limit"
@@ -619,7 +659,7 @@ fn mysql_format2(mysql: &str) -> String {
 
 fn main() {
 	let start = PreciseTime::now();
-	let s = mysql_format2(_MYSQL4);
+	let s = mysql_format2(_MYSQL3);
 	let end = PreciseTime::now();
 
 	println!("{}", s);
