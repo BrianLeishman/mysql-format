@@ -1,14 +1,12 @@
 [package]
 name = "mysql-format"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Brian Leishman <brian@stumpyinc.com>"]
 
 [dependencies]
-time = "0.1.40"
-# htmlescape = "*"
-phf = "0.7.23"
-# lazy_static = "1.2.0"
-# regex = "1.0.6"
+time = "0.1"
+phf = "0.7"
+actix-web = "0.7"
 
-[build-dependencies] 
-phf_codegen = "0.7.23"
+[build-dependencies]
+phf_codegen = "0.7"
