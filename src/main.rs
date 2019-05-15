@@ -39,6 +39,7 @@ fn mysql_format2(mysql: &str) -> String {
     }
     let mut s = String::with_capacity(len * 10);
     let mut i = 0usize;
+    let mut j = 0usize;
     let mut start: usize;
     let mut prev_token = Token::Unset;
     let mut end_tag: &str = "";
@@ -235,6 +236,21 @@ fn mysql_format2(mysql: &str) -> String {
                     i = len - 1
                 }
             };
+        }
+
+        macro_rules! next_non_space {
+            () => {{
+                j = i + 1;
+                while j < len {
+                    match bs[j] {
+                        b' ' | b'\n' | b'\r' | b'\t' => j += 1,
+                        _ => {
+                            break;
+                        }
+                    }
+                }
+                bs[j]
+            }};
         }
 
         macro_rules! push_token_name {
@@ -552,9 +568,6 @@ fn mysql_format2(mysql: &str) -> String {
             | b'<' | b'>' | b'!' | b'%' | b',' => {
                 match bs[i] {
                     b'(' => {
-                        if insert && !values && p == 0 {
-                            push_newline!();
-                        }
                         p += 1;
                     }
                     b')' => p -= 1,
@@ -566,12 +579,16 @@ fn mysql_format2(mysql: &str) -> String {
                 start = i;
                 if i + 1 < len && (bs[i] == b'x' || bs[i] == b'X') && bs[i + 1] == b'\'' {
                     next!(2);
-                    consume_until_esc! {b'\''};
+                    consume_until_esc!(b'\'');
                     next!();
                     push_token_hex!(HexString);
                 } else {
                     consume_all_of!(b'0' ... b'9' | b'A'...b'Z' | b'a'...b'z' | b'$' | b'_');
-                    if i + 1 < len && bs[i + 1] == b'(' && is_function(&lower[start..=i]) {
+                    if i + 1 < len
+                        && next_non_space!() == b'('
+                        && (!insert || values || &lower[start..=i] != "values")
+                        && is_function(&lower[start..=i])
+                    {
                         push_token_function!();
                     } else if is_word(&lower[start..=i]) {
                         push_token_word!();
