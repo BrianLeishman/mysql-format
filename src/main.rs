@@ -53,8 +53,8 @@ fn mysql_format2(mysql: &str) -> String {
     let mut len_after_breakpoint = 0;
     let newline =
         "\n                                                                                "; // ( ͡° ͜ʖ ͡°)
-    let insert = &lower[..6] == "insert" || &lower[..7] == "replace";
-    let mut update = &lower[..6] == "update";
+    let insert = (len >= 6 && &lower[..6] == "insert") || (len >= 7 && &lower[..7] == "replace");
+    let mut update = len >= 6 && &lower[..6] == "update";
     let mut values = false;
 
     while i < len {
