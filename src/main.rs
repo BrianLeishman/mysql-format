@@ -27,6 +27,7 @@ enum Token {
     Function,
     System,
     Variable,
+    Placeholder,
 }
 
 fn mysql_format2(mysql: &str) -> String {
@@ -179,10 +180,6 @@ fn mysql_format2(mysql: &str) -> String {
                 prep_token!($t);
 
                 push_token!($t, $s, $e);
-
-                // if cur_line_len > max_line_len {
-                //     push_breakpoint_newline!();
-                // }
             };
             ($t:ident, $s:expr, $e:expr, $($p:ident),+) => {
                 prep_token!($t);
@@ -193,12 +190,6 @@ fn mysql_format2(mysql: &str) -> String {
                 }
 
                 push_token!($t, $s, $e);
-
-                // if cur_line_len > max_line_len {
-                //     push_breakpoint_newline!();
-                // } else {
-                //     s.push_str(&format!("<u>{{{{cur_line_len: {}}}}}</u>", cur_line_len));
-                // }
             };
         }
 
@@ -338,7 +329,8 @@ fn mysql_format2(mysql: &str) -> String {
                     Function,
                     System,
                     Variable,
-                    Hex
+                    Hex,
+                    Placeholder
                 );
                 push_str!(&mysql[start..=i]);
             };
@@ -372,6 +364,27 @@ fn mysql_format2(mysql: &str) -> String {
             };
         }
 
+        macro_rules! push_token_placeholder {
+            () => {
+                push_token_placeholder!(bs[i]);
+            };
+            ($sym:expr) => {
+                prep_token!(
+                    Placeholder,
+                    "<b>",
+                    "</b>",
+                    Number,
+                    Word,
+                    Function,
+                    System,
+                    Variable,
+                    Hex,
+                    Placeholder
+                );
+                l_push!($sym as char);
+            };
+        }
+
         macro_rules! push_token_word {
             () => {
                 push_token_word!(&lower[start..=i]);
@@ -386,7 +399,8 @@ fn mysql_format2(mysql: &str) -> String {
                     Function,
                     System,
                     Variable,
-                    Hex
+                    Hex,
+                    Placeholder
                 );
 
                 match $word {
@@ -457,7 +471,8 @@ fn mysql_format2(mysql: &str) -> String {
                     Function,
                     System,
                     Variable,
-                    Hex
+                    Hex,
+                    Placeholder
                 );
                 l_push_str!($func);
             };
@@ -474,7 +489,8 @@ fn mysql_format2(mysql: &str) -> String {
                     Function,
                     System,
                     Variable,
-                    Hex
+                    Hex,
+                    Placeholder
                 );
                 l_push_str!(&mysql[start..=i]);
             };
@@ -491,7 +507,8 @@ fn mysql_format2(mysql: &str) -> String {
                     Function,
                     System,
                     Variable,
-                    Hex
+                    Hex,
+                    Placeholder
                 );
                 l_push_str!(&mysql[start..=i]);
             };
@@ -508,7 +525,8 @@ fn mysql_format2(mysql: &str) -> String {
                     Function,
                     System,
                     Variable,
-                    Hex
+                    Hex,
+                    Placeholder
                 );
                 if bs[start] == b'0' {
                     l_push_str!("0x");
@@ -534,6 +552,13 @@ fn mysql_format2(mysql: &str) -> String {
                 next!();
                 start = i;
                 consume_until_esc! {b'\''};
+                push_token_string!();
+                next!();
+            }
+            b'"' => {
+                next!();
+                start = i;
+                consume_until_esc! {b'"'};
                 push_token_string!();
                 next!();
             }
@@ -564,7 +589,7 @@ fn mysql_format2(mysql: &str) -> String {
                     push_token_symbol!();
                 }
             }
-            b'=' | b';' | b'(' | b')' | b'?' | b'^' | b'&' | b'|' | b'/' | b'*' | b':' | b'~'
+            b'=' | b';' | b'(' | b')' | b'^' | b'&' | b'|' | b'/' | b'*' | b':' | b'~'
             | b'<' | b'>' | b'!' | b'%' | b',' => {
                 match bs[i] {
                     b'(' => {
@@ -574,6 +599,9 @@ fn mysql_format2(mysql: &str) -> String {
                     _ => {}
                 }
                 push_token_symbol!();
+            }
+            b'?' => {
+                push_token_placeholder!();
             }
             b'A'...b'Z' | b'a'...b'z' | b'$' | b'_' => {
                 start = i;
