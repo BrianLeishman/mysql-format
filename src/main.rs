@@ -259,62 +259,62 @@ fn mysql_format2(mysql: &str) -> String {
             };
             ($st:expr) => {{
                 let l = &mysql[start..=i].len();
-                let long = l > &(max_line_len - p * 2);
+                // let long = l > &(max_line_len - p * 2);
 
                 let t_start = "<span style=\"color:#009688\">";
                 let t_end = "</span>";
 
-                if long {
-                    push_newline!();
-                    push_token_function!("concat");
-                    push_token_symbol!(b'(');
+                // if long {
+                //     push_newline!();
+                //     push_token_function!("concat");
+                //     push_token_symbol!(b'(');
 
-                    // push_breakpoint_newline!();
+                //     // push_breakpoint_newline!();
 
-                    let str_len = max_line_len - cur_line_len - 10;
-                    // let padding = cur_line_len + 9 - p*2;
-                    let len = $st.len();
-                    let mut last_escaped = false;
-                    // let mut j = 0;
-                    for mut i in &mut (0..len).step_by(str_len) {
-                        prep_token!(String, t_start, t_end);
-                        l_push!('\'');
-                        if i + str_len + 1 < len {
-                            if last_escaped {
-                                last_escaped = false;
-                            // j = i - 1;
-                            } else {
-                                // j = i;
-                            }
-                            if $st.as_bytes()[i + str_len - 1] == b'\\' {
-                                push_str_esc!($st[i..i + str_len - 1]);
-                                i -= 1;
-                                last_escaped = true;
-                            } else {
-                                push_str_esc!($st[i..i + str_len]);
-                            }
-                        } else {
-                            push_str_esc!($st[i..]);
-                        }
-                        l_push!('\'');
+                //     let str_len = max_line_len - cur_line_len - 10;
+                //     // let padding = cur_line_len + 9 - p*2;
+                //     let len = $st.len();
+                //     let mut last_escaped = false;
+                //     // let mut j = 0;
+                //     for mut i in &mut (0..len).step_by(str_len) {
+                //         prep_token!(String, t_start, t_end);
+                //         l_push!('\'');
+                //         if i + str_len + 1 < len {
+                //             if last_escaped {
+                //                 last_escaped = false;
+                //             // j = i - 1;
+                //             } else {
+                //                 // j = i;
+                //             }
+                //             if $st.as_bytes()[i + str_len - 1] == b'\\' {
+                //                 push_str_esc!($st[i..i + str_len - 1]);
+                //                 i -= 1;
+                //                 last_escaped = true;
+                //             } else {
+                //                 push_str_esc!($st[i..i + str_len]);
+                //             }
+                //         } else {
+                //             push_str_esc!($st[i..]);
+                //         }
+                //         l_push!('\'');
 
-                        if i + str_len < len {
-                            if last_escaped {
-                                l_push!(' ');
-                            }
-                            push_token_symbol!(b',');
-                            push_newline!();
-                            l_push_str!(&newline[1..8]);
-                        }
-                    }
+                //         if i + str_len < len {
+                //             if last_escaped {
+                //                 l_push!(' ');
+                //             }
+                //             push_token_symbol!(b',');
+                //             push_newline!();
+                //             l_push_str!(&newline[1..8]);
+                //         }
+                //     }
 
-                    push_token_symbol!(b')');
-                } else {
-                    prep_token!(String, t_start, t_end);
-                    l_push!('\'');
-                    push_str_esc!($st);
-                    l_push!('\'');
-                }
+                //     push_token_symbol!(b')');
+                // } else {
+                prep_token!(String, t_start, t_end);
+                l_push!('\'');
+                push_str_esc!($st);
+                l_push!('\'');
+                // }
             }};
         }
 
