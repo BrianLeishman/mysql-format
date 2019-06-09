@@ -2,9 +2,6 @@ extern crate actix_web;
 extern crate phf;
 extern crate time;
 
-use std::fs;
-use time::PreciseTime;
-
 include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 
 pub fn is_function(word: &str) -> bool {
@@ -40,7 +37,7 @@ fn mysql_format2(mysql: &str) -> String {
     }
     let mut s = String::with_capacity(len * 10);
     let mut i = 0usize;
-    let mut j = 0usize;
+    let mut j: usize;
     let mut start: usize;
     let mut prev_token = Token::Unset;
     let mut end_tag: &str = "";
@@ -74,12 +71,6 @@ fn mysql_format2(mysql: &str) -> String {
             };
         }
 
-        // macro_rules! push {
-        // 	($c:expr) => {
-        // 		s.push($c);
-        // 	};
-        // }
-
         macro_rules! l_push {
             ($c:expr) => {{
                 s.push($c);
@@ -87,10 +78,7 @@ fn mysql_format2(mysql: &str) -> String {
                 len_after_breakpoint += 1;
 
                 if cur_line_len > max_line_len {
-                    // s.push_str(&format!("<u>{{{{yes: cur_line_len: {}}}}}</u>", cur_line_len));
                     push_breakpoint_newline!();
-                } else {
-                    // s.push_str(&format!("<u>{{{{not: cur_line_len: {}}}}}</u>", cur_line_len));
                 }
             }};
         }
@@ -114,18 +102,15 @@ fn mysql_format2(mysql: &str) -> String {
         }
 
         macro_rules! l_push_str {
-			($s:expr) => {
-				s.push_str($s);
-				cur_line_len += $s.len();
+            ($s:expr) => {
+                s.push_str($s);
+                cur_line_len += $s.len();
 
                 if cur_line_len > max_line_len {
-                    // push_str!(&format!("<u>{{{{yes: cur_line_len: {}, last_breakpoint: {}, len_after_breakpoint: {}}}}}</u>", cur_line_len, last_breakpoint, len_after_breakpoint));
                     push_breakpoint_newline!();
-                } else {
-                    // push_str!(&format!("<u>{{{{not: cur_line_len: {}, last_breakpoint: {}, len_after_breakpoint: {}}}}}</u>", cur_line_len, last_breakpoint, len_after_breakpoint));
                 }
-			};
-		}
+            };
+        }
 
         macro_rules! push_str_esc {
             ($s:expr) => {
@@ -164,7 +149,6 @@ fn mysql_format2(mysql: &str) -> String {
 
                 prev_token = Token::$t;
 
-                // start_tag = $s;
                 end_tag = $e;
             };
         }
@@ -194,11 +178,15 @@ fn mysql_format2(mysql: &str) -> String {
         }
 
         macro_rules! consume_until_esc {
-            ($mand_1:expr) => {
+            ($e:expr) => {
                 while i < len {
                     match bs[i] {
-                        $mand_1 => {
-                            break;
+                        $e => {
+                            if i + 1 < len && bs[i+1] == $e {
+                                next!(2);
+                            } else {
+                                break;
+                            }
                         }
                         b'\\' => next!(2),
                         _ => next!(),
@@ -258,63 +246,10 @@ fn mysql_format2(mysql: &str) -> String {
                 push_token_string!(&mysql[start..=i]);
             };
             ($st:expr) => {{
-                let l = &mysql[start..=i].len();
-                // let long = l > &(max_line_len - p * 2);
-
-                let t_start = "<span style=\"color:#009688\">";
-                let t_end = "</span>";
-
-                // if long {
-                //     push_newline!();
-                //     push_token_function!("concat");
-                //     push_token_symbol!(b'(');
-
-                //     // push_breakpoint_newline!();
-
-                //     let str_len = max_line_len - cur_line_len - 10;
-                //     // let padding = cur_line_len + 9 - p*2;
-                //     let len = $st.len();
-                //     let mut last_escaped = false;
-                //     // let mut j = 0;
-                //     for mut i in &mut (0..len).step_by(str_len) {
-                //         prep_token!(String, t_start, t_end);
-                //         l_push!('\'');
-                //         if i + str_len + 1 < len {
-                //             if last_escaped {
-                //                 last_escaped = false;
-                //             // j = i - 1;
-                //             } else {
-                //                 // j = i;
-                //             }
-                //             if $st.as_bytes()[i + str_len - 1] == b'\\' {
-                //                 push_str_esc!($st[i..i + str_len - 1]);
-                //                 i -= 1;
-                //                 last_escaped = true;
-                //             } else {
-                //                 push_str_esc!($st[i..i + str_len]);
-                //             }
-                //         } else {
-                //             push_str_esc!($st[i..]);
-                //         }
-                //         l_push!('\'');
-
-                //         if i + str_len < len {
-                //             if last_escaped {
-                //                 l_push!(' ');
-                //             }
-                //             push_token_symbol!(b',');
-                //             push_newline!();
-                //             l_push_str!(&newline[1..8]);
-                //         }
-                //     }
-
-                //     push_token_symbol!(b')');
-                // } else {
-                prep_token!(String, t_start, t_end);
+                prep_token!(String, "<span style=\"color:#009688\">", "</span>", String);
                 l_push!('\'');
                 push_str_esc!($st);
                 l_push!('\'');
-                // }
             }};
         }
 
@@ -541,6 +476,23 @@ fn mysql_format2(mysql: &str) -> String {
             };
         }
 
+        macro_rules! string_arm {
+            ($e:expr) => {{
+                next!();
+                start = i;
+                // while i < len {
+                consume_until_esc! {$e};
+                //     if i + 2 < len && bs[i + 1] == $e && bs[i + 2] == $e {
+                //         next!(2)
+                //     } else {
+                //         break;
+                //     }
+                // }
+                push_token_string!();
+                next!();
+            }};
+        }
+
         match bs[i] {
             b'`' => {
                 next!();
@@ -549,20 +501,8 @@ fn mysql_format2(mysql: &str) -> String {
                 push_token_name!();
                 next!();
             }
-            b'\'' => {
-                next!();
-                start = i;
-                consume_until_esc! {b'\''};
-                push_token_string!();
-                next!();
-            }
-            b'"' => {
-                next!();
-                start = i;
-                consume_until_esc! {b'"'};
-                push_token_string!();
-                next!();
-            }
+            b'\'' => string_arm!(b'\''),
+            b'"' => string_arm!(b'"'),
             b'0'...b'9' => {
                 start = i;
                 if i + 1 < len && (bs[i + 1] == b'x' || bs[i + 1] == b'X') {
@@ -590,8 +530,8 @@ fn mysql_format2(mysql: &str) -> String {
                     push_token_symbol!();
                 }
             }
-            b'=' | b';' | b'(' | b')' | b'^' | b'&' | b'|' | b'/' | b'*' | b':' | b'~'
-            | b'<' | b'>' | b'!' | b'%' | b',' => {
+            b'=' | b';' | b'(' | b')' | b'^' | b'&' | b'|' | b'/' | b'*' | b':' | b'~' | b'<'
+            | b'>' | b'!' | b'%' | b',' => {
                 match bs[i] {
                     b'(' => {
                         p += 1;
