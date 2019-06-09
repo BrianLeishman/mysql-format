@@ -438,6 +438,7 @@ fn mysql_format2(mysql: &str) -> String {
                     }
                     if $word == "update" {
                         update = true;
+                        values = true;
                         push_newline!();
                     }
                 }
