@@ -27,6 +27,11 @@ enum Token {
     Placeholder,
 }
 
+struct StringPart {
+    start: usize,
+    i: usize,
+}
+
 fn mysql_format2(mysql: &str) -> String {
     let mysql = mysql.trim();
     let bs = mysql.as_bytes();
@@ -182,7 +187,7 @@ fn mysql_format2(mysql: &str) -> String {
                 while i < len {
                     match bs[i] {
                         $e => {
-                            if i + 1 < len && bs[i+1] == $e {
+                            if i + 1 < len && bs[i + 1] == $e {
                                 next!(2);
                             } else {
                                 break;
@@ -218,8 +223,8 @@ fn mysql_format2(mysql: &str) -> String {
         }
 
         macro_rules! next_non_space {
-            () => {{
-                j = i + 1;
+            ($e:expr) => {{
+                j = i + $e;
                 while j < len {
                     match bs[j] {
                         b' ' | b'\n' | b'\r' | b'\t' => j += 1,
@@ -230,6 +235,9 @@ fn mysql_format2(mysql: &str) -> String {
                 }
                 bs[j]
             }};
+            () => {
+                next_non_space!(1)
+            };
         }
 
         macro_rules! push_token_name {
@@ -239,18 +247,6 @@ fn mysql_format2(mysql: &str) -> String {
                 push_str_esc!(&mysql[start..=i]);
                 l_push!('`');
             };
-        }
-
-        macro_rules! push_token_string {
-            () => {
-                push_token_string!(&mysql[start..=i]);
-            };
-            ($st:expr) => {{
-                prep_token!(String, "<span style=\"color:#009688\">", "</span>", String);
-                l_push!('\'');
-                push_str_esc!($st);
-                l_push!('\'');
-            }};
         }
 
         macro_rules! push_token_number {
@@ -477,18 +473,38 @@ fn mysql_format2(mysql: &str) -> String {
         }
 
         macro_rules! string_arm {
-            ($e:expr) => {{
+            ($e:expr, $label:tt) => {{
                 next!();
                 start = i;
-                // while i < len {
-                consume_until_esc! {$e};
-                //     if i + 2 < len && bs[i + 1] == $e && bs[i + 2] == $e {
-                //         next!(2)
-                //     } else {
-                //         break;
-                //     }
-                // }
-                push_token_string!();
+                let mut parts = Vec::new();
+                $label: while {
+                    consume_until_esc!($e);
+                    parts.push(StringPart{
+                        start: start,
+                        i: i,
+                    });
+
+                    if i + 1 + 2 < len {
+                        if next_non_space!(2) == $e {
+                            next!(j-i+1);
+                            start = i;
+                        } else {
+                            break $label;
+                        }
+                    } else {
+                        break $label;
+                    }
+
+                    i < len
+                } {}
+
+                prep_token!(String, "<span style=\"color:#009688\">", "</span>", String);
+                l_push!($e as char);
+                for p in &parts {
+                    push_str_esc!(&mysql[p.start..=p.i]);
+                }
+                l_push!($e as char);
+
                 next!();
             }};
         }
@@ -501,8 +517,8 @@ fn mysql_format2(mysql: &str) -> String {
                 push_token_name!();
                 next!();
             }
-            b'\'' => string_arm!(b'\''),
-            b'"' => string_arm!(b'"'),
+            b'\'' => string_arm!(b'\'', 'single),
+            b'"' => string_arm!(b'"', 'double),
             b'0'...b'9' => {
                 start = i;
                 if i + 1 < len && (bs[i + 1] == b'x' || bs[i + 1] == b'X') {
