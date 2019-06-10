@@ -25,6 +25,7 @@ enum Token {
     System,
     Variable,
     Placeholder,
+    Comment,
 }
 
 struct StringPart {
@@ -204,6 +205,23 @@ fn mysql_format2(mysql: &str) -> String {
             };
         }
 
+        macro_rules! consume_until {
+            ($e:expr) => {
+                while i < len {
+                    match bs[i] {
+                        $e => {
+                            break;
+                        }
+                        _ => next!(),
+                    }
+                }
+                prev!();
+                if i >= len {
+                    i = len - 1
+                }
+            };
+        }
+
         macro_rules! consume_all_of {
             ($($p:pat)|+) => {
                 next!();
@@ -313,6 +331,16 @@ fn mysql_format2(mysql: &str) -> String {
                     Placeholder
                 );
                 l_push!($sym as char);
+            };
+        }
+
+        macro_rules! push_token_comment {
+            () => {
+                push_token_comment!(&mysql[start..=i]);
+            };
+            ($e:expr) => {
+                prep_token!(Comment, "<span style=\"color:#AAA\">", "</span>");
+                push_str_esc!($e);
             };
         }
 
@@ -532,6 +560,13 @@ fn mysql_format2(mysql: &str) -> String {
             }
             b'.' | b'+' | b'-' => {
                 if i + 1 < len {
+                    // if i + 2 < len && bs[i] == b'-' && bs[i] == b'-' && bs[i] == b' ' {
+                    //     start = i;
+                    //     next!(3);
+                    //     consume_until!(b'\n');
+                    //     next!();
+                    //     push_token_comment!();
+                    // } else {
                     match bs[i + 1] {
                         b'0'...b'9' | b'.' | b'+' | b'-' => {
                             start = i;
@@ -542,12 +577,13 @@ fn mysql_format2(mysql: &str) -> String {
                             push_token_symbol!();
                         }
                     }
+                // }
                 } else {
                     push_token_symbol!();
                 }
             }
-            b'=' | b';' | b'(' | b')' | b'^' | b'&' | b'|' | b'/' | b'*' | b':' | b'~' | b'<'
-            | b'>' | b'!' | b'%' | b',' => {
+            b'=' | b';' | b'(' | b')' | b'^' | b'&' | b'|' | b'*' | b':' | b'~' | b'<' | b'>'
+            | b'!' | b'%' | b',' => {
                 match bs[i] {
                     b'(' => {
                         p += 1;
@@ -556,6 +592,22 @@ fn mysql_format2(mysql: &str) -> String {
                     _ => {}
                 }
                 push_token_symbol!();
+            }
+            b'/' => {
+                if i + 1 < len && bs[i + 1] == b'*' {
+                    start = i;
+                    next!(2);
+                    while {
+                        consume_until!(b'*');
+                        next!();
+
+                        i + 1 < len && bs[i + 1] != b'/'
+                    } {}
+                    next!();
+                    push_token_comment!();
+                } else {
+                    push_token_symbol!();
+                }
             }
             b'?' => {
                 push_token_placeholder!();
