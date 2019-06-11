@@ -308,7 +308,7 @@ fn mysql_format2(mysql: &str) -> String {
                             breakpoint_p = p;
                         }
                     }
-                    b'=' | b'+' | b'-' | b'*' | b'/' | b')' => {
+                    b'=' | b'+' | b'-' | b'*' | b'/' => {
                         last_breakpoint = s.len();
                         len_after_breakpoint = 0;
                         breakpoint_p = p + 1;
