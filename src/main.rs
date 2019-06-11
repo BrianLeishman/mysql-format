@@ -10,6 +10,9 @@ pub fn is_function(word: &str) -> bool {
 pub fn is_word(word: &str) -> bool {
     KEYWORDS.contains(word)
 }
+pub fn is_encoding(word: &str) -> bool {
+    ENCODINGS.contains(word)
+}
 
 #[derive(PartialEq)]
 enum Token {
@@ -26,6 +29,7 @@ enum Token {
     Variable,
     Placeholder,
     Comment,
+    Encoding,
 }
 
 struct StringPart {
@@ -279,7 +283,8 @@ fn mysql_format2(mysql: &str) -> String {
                     System,
                     Variable,
                     Hex,
-                    Placeholder
+                    Placeholder,
+                    Encoding
                 );
                 push_str!(&mysql[start..=i]);
             };
@@ -328,7 +333,8 @@ fn mysql_format2(mysql: &str) -> String {
                     System,
                     Variable,
                     Hex,
-                    Placeholder
+                    Placeholder,
+                    Encoding
                 );
                 l_push!($sym as char);
             };
@@ -359,7 +365,8 @@ fn mysql_format2(mysql: &str) -> String {
                     System,
                     Variable,
                     Hex,
-                    Placeholder
+                    Placeholder,
+                    Encoding
                 );
 
                 match $word {
@@ -432,7 +439,30 @@ fn mysql_format2(mysql: &str) -> String {
                     System,
                     Variable,
                     Hex,
-                    Placeholder
+                    Placeholder,
+                    Encoding
+                );
+                l_push_str!($func);
+            };
+        }
+
+        macro_rules! push_token_encoding {
+            () => {
+                push_token_encoding!(&lower[start..=i]);
+            };
+            ($func:expr) => {
+                prep_token!(
+                    Encoding,
+                    "<span style=\"color:#03A9F4\">",
+                    "</span>",
+                    Number,
+                    Word,
+                    Function,
+                    System,
+                    Variable,
+                    Hex,
+                    Placeholder,
+                    Encoding
                 );
                 l_push_str!($func);
             };
@@ -450,7 +480,8 @@ fn mysql_format2(mysql: &str) -> String {
                     System,
                     Variable,
                     Hex,
-                    Placeholder
+                    Placeholder,
+                    Encoding
                 );
                 l_push_str!(&mysql[start..=i]);
             };
@@ -468,7 +499,8 @@ fn mysql_format2(mysql: &str) -> String {
                     System,
                     Variable,
                     Hex,
-                    Placeholder
+                    Placeholder,
+                    Encoding
                 );
                 l_push_str!(&mysql[start..=i]);
             };
@@ -486,7 +518,8 @@ fn mysql_format2(mysql: &str) -> String {
                     System,
                     Variable,
                     Hex,
-                    Placeholder
+                    Placeholder,
+                    Encoding
                 );
                 if bs[start] == b'0' {
                     l_push_str!("0x");
@@ -621,7 +654,10 @@ fn mysql_format2(mysql: &str) -> String {
                     push_token_hex!(HexString);
                 } else {
                     consume_all_of!(b'0' ... b'9' | b'A'...b'Z' | b'a'...b'z' | b'$' | b'_');
-                    if i + 1 < len
+
+                    if is_encoding(&lower[start..=i]) {
+                        push_token_encoding!();
+                    } else if i + 1 < len
                         && next_non_space!() == b'('
                         && (!insert || values || &lower[start..=i] != "values")
                         && is_function(&lower[start..=i])
