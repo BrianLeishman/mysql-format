@@ -1,6 +1,8 @@
 extern crate actix_web;
 extern crate phf;
 extern crate time;
+#[macro_use]
+extern crate serde_derive;
 
 include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 
@@ -308,11 +310,11 @@ fn mysql_format2(mysql: &str) -> String {
                             breakpoint_p = p;
                         }
                     }
-                    b'=' | b'+' | b'-' | b'*' | b'/' => {
-                        last_breakpoint = s.len();
-                        len_after_breakpoint = 0;
-                        breakpoint_p = p + 1;
-                    }
+                    // b'=' | b'+' | b'-' | b'*' | b'/' => {
+                    //     last_breakpoint = s.len();
+                    //     len_after_breakpoint = 0;
+                    //     breakpoint_p = p + 1;
+                    // }
                     _ => {}
                 }
             };
@@ -580,14 +582,14 @@ fn mysql_format2(mysql: &str) -> String {
             }
             b'\'' => string_arm!(b'\'', 'single),
             b'"' => string_arm!(b'"', 'double),
-            b'0'...b'9' => {
+            b'0'..=b'9' => {
                 start = i;
                 if i + 1 < len && (bs[i + 1] == b'x' || bs[i + 1] == b'X') {
                     next!();
-                    consume_all_of!(b'0' ... b'9' | b'a' ... b'f' | b'A' ... b'F');
+                    consume_all_of!(b'0' ..= b'9' | b'a' ..= b'f' | b'A' ..= b'F');
                     push_token_hex!(Hex);
                 } else {
-                    consume_all_of!(b'0' ... b'9' | b'.');
+                    consume_all_of!(b'0' ..= b'9' | b'.');
                     push_token_number!();
                 }
             }
@@ -601,9 +603,9 @@ fn mysql_format2(mysql: &str) -> String {
                     //     push_token_comment!();
                     // } else {
                     match bs[i + 1] {
-                        b'0'...b'9' | b'.' | b'+' | b'-' => {
+                        b'0'..=b'9' | b'.' | b'+' | b'-' => {
                             start = i;
-                            consume_all_of!(b'0' ... b'9' | b'.');
+                            consume_all_of!(b'0' ..= b'9' | b'.');
                             push_token_number!();
                         }
                         _ => {
@@ -645,7 +647,7 @@ fn mysql_format2(mysql: &str) -> String {
             b'?' => {
                 push_token_placeholder!();
             }
-            b'A'...b'Z' | b'a'...b'z' | b'$' | b'_' => {
+            b'A'..=b'Z' | b'a'..=b'z' | b'$' | b'_' => {
                 start = i;
                 if i + 1 < len && (bs[i] == b'x' || bs[i] == b'X') && bs[i + 1] == b'\'' {
                     next!(2);
@@ -653,7 +655,7 @@ fn mysql_format2(mysql: &str) -> String {
                     next!();
                     push_token_hex!(HexString);
                 } else {
-                    consume_all_of!(b'0' ... b'9' | b'A'...b'Z' | b'a'...b'z' | b'$' | b'_');
+                    consume_all_of!(b'0' ..= b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'$' | b'_');
 
                     if is_encoding(&lower[start..=i]) {
                         push_token_encoding!();
@@ -677,7 +679,7 @@ fn mysql_format2(mysql: &str) -> String {
                     sys = true;
                     next!();
                 }
-                consume_all_of!(b'0' ... b'9' | b'A'...b'Z' | b'a'...b'z' | b'$' | b'_');
+                consume_all_of!(b'0' ..= b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'$' | b'_');
                 if sys {
                     push_token_system!();
                 } else {
@@ -696,18 +698,29 @@ fn mysql_format2(mysql: &str) -> String {
     return s;
 }
 
-use actix_web::{http, server, App, HttpRequest, HttpResponse};
+use actix_web::{
+    web, App, HttpResponse, HttpServer, Result,
+};
 
-fn index(req: &HttpRequest) -> HttpResponse {
-    let q = req.query().get("q").unwrap().to_owned();
-    HttpResponse::Ok()
-        .content_type("text/html; charset=utf-8")
-        .body(mysql_format2(&q))
+#[derive(Deserialize)]
+pub struct MyParams {
+    q: String,
 }
 
-fn main() {
-    server::new(|| App::new().resource("/", |r| r.method(http::Method::GET).f(index)))
-        .bind("127.0.0.1:48627")
-        .unwrap()
-        .run();
+fn index(params: web::Form<MyParams>) -> Result<HttpResponse> {
+    Ok(HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        // .body("test"))
+        .body(mysql_format2(&params.q[..])))
+}
+
+fn main() -> std::io::Result<()> {
+    HttpServer::new(|| {
+        App::new().service(
+            web::resource("/")
+                .route(web::post().to(index))
+        )
+    })
+    .bind("127.0.0.1:48627")?
+    .run()
 }
