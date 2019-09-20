@@ -699,7 +699,7 @@ fn mysql_format2(mysql: &str) -> String {
 }
 
 use actix_web::{
-    web, App, HttpResponse, HttpServer, Result,
+    web, App, HttpResponse, HttpServer, FromRequest, Result,
 };
 
 #[derive(Deserialize)]
@@ -718,7 +718,10 @@ fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new().service(
             web::resource("/")
-                .route(web::post().to(index))
+                .route(web::post()
+                    .to(index)
+                )
+                .data(web::Form::<MyParams>::configure(|cfg| cfg.limit(256 * 1024)))
         )
     })
     .bind("127.0.0.1:48627")?
