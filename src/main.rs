@@ -710,7 +710,6 @@ pub struct MyParams {
 fn index(params: web::Form<MyParams>) -> Result<HttpResponse> {
     Ok(HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
-        // .body("test"))
         .body(mysql_format2(&params.q[..])))
 }
 
@@ -724,6 +723,6 @@ fn main() -> std::io::Result<()> {
                 .data(web::Form::<MyParams>::configure(|cfg| cfg.limit(256 * 1024)))
         )
     })
-    .bind("127.0.0.1:48627")?
+    .bind("127.0.0.1:8080")?
     .run()
 }
