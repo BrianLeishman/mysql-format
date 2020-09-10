@@ -723,6 +723,6 @@ fn main() -> std::io::Result<()> {
                 .data(web::Form::<MyParams>::configure(|cfg| cfg.limit(256 * 1024)))
         )
     })
-    .bind("127.0.0.1:8080")?
+    .bind("0.0.0.0:48627")?
     .run()
 }
