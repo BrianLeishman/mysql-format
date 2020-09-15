@@ -6,10 +6,10 @@ ADD . .
 
 RUN cargo install --path .
 
-FROM alpine:latest
+FROM debian:buster-slim
 
 COPY --from=builder /usr/local/cargo/bin/mysql-format /usr/local/bin/mysql-format
 
 EXPOSE 8080
 
-CMD ./mysql-format
+CMD mysql-format
