@@ -32,6 +32,7 @@ enum Token {
     Placeholder,
     Comment,
     Encoding,
+    Template,
 }
 
 struct StringPart {
@@ -493,7 +494,7 @@ fn mysql_format2(mysql: &str) -> String {
             () => {
                 prep_token!(
                     Variable,
-                    "<span style=\"color:#546E7A\">",
+                    "<span style=\"color:#FBC02D\">",
                     "</span>",
                     Number,
                     Word,
@@ -503,6 +504,17 @@ fn mysql_format2(mysql: &str) -> String {
                     Hex,
                     Placeholder,
                     Encoding
+                );
+                l_push_str!(&mysql[start..=i]);
+            };
+        }
+
+        macro_rules! push_token_template {
+            () => {
+                prep_token!(
+                    Template,
+                    "<span style=\"color:#F9A825\">",
+                    "</span>"
                 );
                 l_push_str!(&mysql[start..=i]);
             };
@@ -685,6 +697,13 @@ fn mysql_format2(mysql: &str) -> String {
                 } else {
                     push_token_variable!();
                 }
+            }
+            b'{' => {
+                start = i;
+                next!(); // one more `{`
+                consume_until!(b'}');
+                next!(2); // one more `}`
+                push_token_template!();
             }
             _ => {}
         }
